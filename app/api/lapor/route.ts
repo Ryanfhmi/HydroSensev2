@@ -11,6 +11,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { vibration, status } = body;
 
+    console.log('Data dari ESP32:', vibration, status);
+
     if (vibration === undefined || status === undefined) {
       return NextResponse.json(
         { error: 'Payload harus berisi vibration dan status' },
@@ -18,9 +20,17 @@ export async function POST(req: Request) {
       );
     }
 
+    const vibrationValue = Number(vibration);
+    if (Number.isNaN(vibrationValue)) {
+      return NextResponse.json(
+        { error: 'Nilai vibration harus berupa angka' },
+        { status: 400 }
+      );
+    }
+
     const { error } = await supabase
       .from('leakdetektor')
-      .insert([{ vibration, status }]);
+      .insert([{ vibration: vibrationValue, status }]);
 
     if (error) {
       console.error('Supabase insert error:', error);
