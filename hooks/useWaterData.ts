@@ -26,6 +26,7 @@ interface WaterData {
 interface UseWaterDataReturn {
   data: WaterData | null;
   sensorData: SensorData | null;
+  laporData: any[];
   historicalData: ChartDataPoint[];
   currentVibration: number;
   currentFlow: number;
@@ -43,6 +44,7 @@ interface UseWaterDataReturn {
 export function useWaterData(deviceId?: string): UseWaterDataReturn {
   const [data, setData] = useState<WaterData | null>(null);
   const [sensorData, setSensorData] = useState<SensorData | null>(null);
+  const [laporData, setLaporData] = useState<any[]>([]);
   const [historicalData, setHistoricalData] = useState<ChartDataPoint[]>([]);
   const [currentVibration, setCurrentVibration] = useState(0);
   const [currentFlow, setCurrentFlow] = useState(0);
@@ -72,63 +74,81 @@ export function useWaterData(deviceId?: string): UseWaterDataReturn {
     try {
       setError(null);
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.30.200:5000';
-      const url = `${apiUrl}/api/status-sekarang`;
-
-      const response = await fetch(url, {
+      const response = await fetch('/api/lapor', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
+      const result = await response.json();
+      console.log('API /api/lapor result:', result);
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
 
-      const rawData: SensorData = await response.json();
-      setSensorData(rawData);
+      if (!Array.isArray(result)) {
+        throw new Error('Expected array from /api/lapor');
+      }
 
-      // Calculate vibration and flow
-      const vibration = calculateVibration(rawData.nilai);
-      const flow = calculateFlow(rawData.nilai);
+      setLaporData(result);
 
-      // Update current values
-      setCurrentVibration(vibration);
-      setCurrentFlow(flow);
+      const mappedData = result.map((item: any) => {
+        const vibration = Number(item.vibration ?? item.nilai ?? 0);
+        const time = item.created_at
+          ? new Date(item.created_at).toLocaleTimeString('id-ID', {
+              timeZone: 'Asia/Jakarta',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          : new Date().toLocaleTimeString('id-ID', {
+              timeZone: 'Asia/Jakarta',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
 
-      // Map sensor data to WaterData format for compatibility
-      const mappedData: WaterData = {
-        deviceId: deviceId || 'ESP32-Main',
-        temperature: 0,
-        pressure: 0,
-        flowRate: flow,
-        signalStrength: 85,
-        leakDetected: rawData.status === 'LEAK',
-        timestamp: rawData.timestamp,
-      };
-
-      setData(mappedData);
-
-      // Add to historical data (keep last 20 readings)
-      setHistoricalData((prevData) => {
-        const timeString = new Date().toLocaleTimeString('id-ID', {
-          timeZone: 'Asia/Jakarta',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        });
-        const newDataPoint: ChartDataPoint = {
-          time: timeString,
-          vibration: vibration,
-          gForce: vibration, // For chart compatibility
-          flow: flow,
+        return {
+          time,
+          vibration,
+          gForce: vibration,
+          flow: calculateFlow(vibration),
+          status: item.status || 'KOSONG',
+          timestamp: item.created_at || new Date().toISOString(),
         };
-
-        const updatedData = [...prevData, newDataPoint];
-        // Keep only the last 20 readings
-        return updatedData.slice(-20);
       });
+
+      const latestItem = mappedData[0] || null;
+      const historical = mappedData.slice().reverse();
+
+      setCurrentVibration(latestItem?.gForce ?? 0);
+      setCurrentFlow(latestItem?.flow ?? 0);
+      setSensorData(
+        latestItem
+          ? {
+              nilai: latestItem.vibration,
+              status: latestItem.status,
+              timestamp: latestItem.timestamp,
+            }
+          : null
+      );
+      setData(
+        latestItem
+          ? {
+              deviceId: deviceId || 'ESP32-Main',
+              temperature: 0,
+              pressure: 0,
+              flowRate: latestItem.flow,
+              signalStrength: 85,
+              leakDetected: latestItem.status === 'LEAK',
+              timestamp: latestItem.timestamp,
+            }
+          : null
+      );
+
+      setHistoricalData(historical.slice(-20));
 
       setIsLoading(false);
     } catch (err) {
@@ -154,6 +174,7 @@ export function useWaterData(deviceId?: string): UseWaterDataReturn {
   return {
     data,
     sensorData,
+    laporData,
     historicalData,
     currentVibration,
     currentFlow,
