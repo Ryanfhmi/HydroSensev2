@@ -59,7 +59,8 @@ export function checkLeakStatus(flowRate: number, threshold = 3): boolean {
  */
 export function formatTimestamp(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleTimeString('en-US', {
+  return d.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -71,7 +72,7 @@ export function formatTimestamp(date: string | Date): string {
  */
 export function formatDate(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString('id-ID', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',

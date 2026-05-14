@@ -112,7 +112,12 @@ export function useWaterData(deviceId?: string): UseWaterDataReturn {
 
       // Add to historical data (keep last 20 readings)
       setHistoricalData((prevData) => {
-        const timeString = new Date().toLocaleTimeString();
+        const timeString = new Date().toLocaleTimeString('id-ID', {
+          timeZone: 'Asia/Jakarta',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
         const newDataPoint: ChartDataPoint = {
           time: timeString,
           vibration: vibration,
